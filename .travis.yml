@@ -1,0 +1,26 @@
+language: cpp
+
+addons:
+  apt:
+    packages:
+      - python-pip
+
+sudo: true
+
+os: linux
+
+compiler:
+  - gcc
+
+before_install:
+  # so that adjusted PATH propagates into sudo
+  - sudo sed -i -e 's/^Defaults\tsecure_path.*$//' /etc/sudoers
+  # Install updated version of pylint
+  - sudo pip install pylint
+  - cd $TRAVIS_BUILD_DIR/
+
+install:
+  - python setup.py install
+
+script:
+  - cd node_dcm && python -m unittest tests.test_ae.py

@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from logman import bot
+from .logman import bot
 import os
 import socket
 import time
@@ -139,7 +139,7 @@ class BaseSCP(threading.Thread):
         return self.raise_not_implemented('on_c_cancel_move')
 
     def raise_not_implemented(self,name):
-        return raise RuntimeError("%s is not implemented for this application entity." %name)
+        raise RuntimeError("%s is not implemented for this application entity." %name)
 
 
 class VerificationSCP(BaseSCP):
@@ -172,8 +172,8 @@ class StorageSCP(BaseSCP):
     out_of_resources = failure.out_of_resources
     ds_doesnt_match_sop_fail = failure.ds_doesnt_match_sop
     cant_understand = failure.cant_understand
-    coercion_of_elements = failure.coercion_of_elements
-    ds_doesnt_match_sop_warn = warning.ds_doesnt_match
+    coercion_of_elements = warning.coercion_of_elements
+    ds_doesnt_match_sop_warn = warning.ds_doesnt_match_sop
     elem_discard = warning.element_discard
     success = success.empty
 
@@ -203,7 +203,7 @@ class FindSCP(BaseSCP):
     unable_to_process = failure.unable_to_process
     matching_terminated_cancel = cancel.matching_terminated
     success = success.matching
-    pending = pending.matches
+    pending_matches = pending.matches
     pending_warning = pending.matches_warning
 
     def __init__(self, port=None):
@@ -216,7 +216,7 @@ class FindSCP(BaseSCP):
                                PatientStudyOnlyQueryRetrieveInformationModelFind],
                                port=port)
         BaseSCP.__init__(self,ae=ae)
-        self.status = self.pending
+        self.status = self.pending_matches
         self.cancel = False
 
     def on_c_find(self, ds):
@@ -298,7 +298,7 @@ class GetSCP(BaseSCP):
 class MoveSCP(BaseSCP):
     '''A threaded dummy storage SCP used for testing'''
     out_of_resources_match = failure.out_of_resources_match
-    out_of_resources_unable = failure.out_of_resources_enable
+    out_of_resources_unable = failure.out_of_resources_unable
     move_destination_unknown = failure.move_destination_unknown
     identifier_doesnt_match_sop = failure.identifier_doesnt_match_sop
     unable_to_process = failure.unable_to_process

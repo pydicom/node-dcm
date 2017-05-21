@@ -26,14 +26,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from logman import bot
+from .logman import bot
 from pynetdicom3.sop_class import Status
 
 ##############################################################################
 # Success
 ##############################################################################
 
-class success
+class success:
     empty = Status('Success', 
                    '', 
                    range(0x0000, 0x0000 + 1))
@@ -62,7 +62,7 @@ class testing:
 ##############################################################################
 
 
-class warning
+class warning:
     coercion_of_elements = Status('Warning', 
                                   'Coercion of Data Elements',
                                    range(0xB000, 0xB000 + 1))
