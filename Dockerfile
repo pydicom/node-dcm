@@ -28,6 +28,9 @@ ADD . /code
 RUN pip install -r requirements.txt
 RUN apt-get remove -y gfortran
 
+# Install node_dcm
+RUN python setup.py install
+
 RUN apt-get autoremove -y
 RUN apt-get clean
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
