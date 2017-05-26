@@ -245,9 +245,11 @@ class Store(BaseSCU):
             with open(dcm_file, 'rb') as filey:
                 dataset = read_file(filey, force=True)
             
-            if self.assoc.is_established:
-                bot.info('Sending file: {0!s}'.format(dcm_file))
-                status = self.assoc.send_c_store(dataset)
+            if not self.assoc.is_established:
+                self.make_assoc()
+
+            bot.info('Sending file: {0!s}'.format(dcm_file))
+            status = self.assoc.send_c_store(dataset)
 
         self.assoc.release()
 
