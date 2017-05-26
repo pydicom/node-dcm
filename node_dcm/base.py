@@ -36,16 +36,41 @@ from .status import testing
 import threading
 from .validate import validate_port
 
-class BaseSCP(threading.Thread):
-    '''Base class for the SCP classes'''
 
-    bad_status = testing.test
+class BaseSCU(BaseServiceClass):
+    '''Base class for the SCU classes'''
+
+    def __init__(self,ae=None):
+
+        self.ae = ae
+        if self.ae is None:
+            bot.logger.error("The BaseSCU must be instantiated with an Application Entity (AE).")
+            sys.exit(1)
+        BaseServiceClass.__init__(self)
+
+
+
+class BaseSCP(BaseServiceClass):
+    '''Base class for the SCP classes'''
 
     def __init__(self,ae=None):
 
         self.ae = ae
         if self.ae is None:
             bot.logger.error("The BaseSCP must be instantiated with an Application Entity (AE).")
+            sys.exit(1)
+        BaseServiceClass.__init__(self)
+
+
+
+class BaseServiceClass(threading.Thread):
+    '''Base class for the SCP and SCU classes'''
+
+    def __init__(self,ae=None):
+
+        self.ae = ae
+        if self.ae is None:
+            bot.logger.error("The base service must be instantiated with an Application Entity (AE).")
             sys.exit(1)
  
         # Validate that the port specified works
@@ -95,6 +120,7 @@ class BaseSCP(threading.Thread):
     def stop(self):
         '''Stop the SCP thread'''
         self.ae.stop()
+
 
     def abort(self):
         '''Abort any associations'''
