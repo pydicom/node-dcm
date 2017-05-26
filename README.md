@@ -1,76 +1,8 @@
 # node-dcm
 
-This will build a basic Docker image using [pynetdicom3](https://github.com/scaramallion/pynetdicom3) and [pydicom](https://github.com/darcymason/pydicom)
+This will provide recipes for basic Docker images using [pynetdicom3](https://github.com/scaramallion/pynetdicom3) and [pydicom](https://github.com/darcymason/pydicom) to implement different kinds of Service Class Providers and Service Class Users. I'm still learning a lot about Dicom, so this is a work in progress!
 
 **under development**
-
-
-## Testing
-
-The below is testing and thinking that I am doing, it is not ready for use.
-
-
-```
-docker build -t vanessa/netdicom .
-```
-
-and then to shell into
-
-```
-docker run -it vanessa/netdicom /bin/bash
-```
-
-To test, I deployed two images, as above, and then started running the server in one:
-
-```
-docker run -it vanessa/netdicom /bin/bash
-python
-
->>> from pynetdicom3 import AE, VerificationSOPClass
-
-ae = AE(port=3031, scp_sop_class=[VerificationSOPClass])
-
-# Start the SCP
-ae.start()
-```
-
-Then (on my host) I used docker inspect to get the ip address of the other running image.
-
-```
-docker inspect vanessa/netdicom2
-# look for IpAddress
-```
-
-and then I could send a signal to my first instance
-
-```
-from pynetdicom3 import AE
-
-# The Verification SOP Class has a UID of 1.2.840.10008.1.1
-ae = AE(scu_sop_class=['1.2.840.10008.1.1'])
-addr = '172.17.0.2'
-port = 3031
-
-# Try and associate with the peer AE
-# Returns the Association thread
-print('Requesting Association with the peer')
-assoc = ae.associate(addr, port)
-
-if assoc.is_established: # returns True
-    print('Association accepted by the peer')
-    # Send a DIMSE C-ECHO request to the peer
-    echo = assoc.send_c_echo()
-    print(echo.status_type) # Success
-    # Release the association
-    assoc.release()
-elif assoc.is_rejected:
-    print('Association was rejected by the peer')
-elif assoc.is_aborted:
-    print('Received an A-ABORT from the peer during Association')
-```
-
-The above is basic testing, next I will try to implement various functions with storage, verification, and find using a more robust class of servers (still under development).
-
 
 
 ## Google Cloud

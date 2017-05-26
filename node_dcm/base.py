@@ -24,47 +24,17 @@ SOFTWARE.
 
 from .logman import bot
 import os
-import socket
-import time
-import threading
 
-from pydicom import read_file
-from pydicom.dataset import Dataset
 from pydicom.uid import (
-    UID, 
-    ImplicitVRLittleEndian
+    ExplicitVRLittleEndian, 
+    ExplicitVRBigEndian,
+    ImplicitVRLittleEndian,
+    UID
 )
 
-from pynetdicom3 import (
-    AE, 
-    VerificationSOPClass
-)
-
-from pynetdicom3.sop_class import (
-    CTImageStorage, 
-    MRImageStorage,
-    RTImageStorage,
-    PatientRootQueryRetrieveInformationModelFind,                                   
-    StudyRootQueryRetrieveInformationModelFind,
-    ModalityWorklistInformationFind,
-    PatientStudyOnlyQueryRetrieveInformationModelFind,
-    PatientRootQueryRetrieveInformationModelGet,
-    StudyRootQueryRetrieveInformationModelGet,
-    PatientStudyOnlyQueryRetrieveInformationModelGet,
-    PatientRootQueryRetrieveInformationModelMove,
-    StudyRootQueryRetrieveInformationModelMove,
-    PatientStudyOnlyQueryRetrieveInformationModelMove,
-    Status
-)
-
-from .status import (
-    success,
-    failure,
-    pending,
-    testing,
-    cancel,
-    warning
-)
+from .status import testing
+import threading
+from .validate import validate_port
 
 class BaseSCP(threading.Thread):
     '''Base class for the SCP classes'''
@@ -77,6 +47,10 @@ class BaseSCP(threading.Thread):
         if self.ae is None:
             bot.logger.error("The BaseSCP must be instantiated with an Application Entity (AE).")
             sys.exit(1)
+ 
+        # Validate that the port specified works
+        if self.ae.port is not None:
+            validate_port(self.ae.port)
 
         self.ae.on_c_echo = self.on_c_echo
         self.ae.on_c_store = self.on_c_store
@@ -87,6 +61,32 @@ class BaseSCP(threading.Thread):
         self.daemon = True
         self.delay = 0
         self.send_abort = False
+
+
+    def update_transfer_syntax(self,prefer_uncompr=True,prefer_little=False,
+                               prefer_big=False,implicit=False)
+
+        transfer_syntax = [ImplicitVRLittleEndian,
+                           ExplicitVRLittleEndian,
+                           ExplicitVRBigEndian]
+
+        if prefer_uncompr and ImplicitVRLittleEndian in transfer_syntax:
+            transfer_syntax.remove(ImplicitVRLittleEndian)
+            transfer_syntax.append(ImplicitVRLittleEndian)
+
+        if implicit:
+            transfer_syntax = [ImplicitVRLittleEndian]
+
+        if prefer_little and ExplicitVRLittleEndian in transfer_syntax:
+            transfer_syntax.remove(ExplicitVRLittleEndian)
+            transfer_syntax.insert(0, ExplicitVRLittleEndian)
+
+        if prefer_big and ExplicitVRBigEndian in transfer_syntax:
+            transfer_syntax.remove(ExplicitVRBigEndian)
+            transfer_syntax.insert(0, ExplicitVRBigEndian)
+
+        self.transfer_syntax = transfer_syntax
+
 
     def run(self):
         '''The thread run method'''
@@ -140,217 +140,3 @@ class BaseSCP(threading.Thread):
 
     def raise_not_implemented(self,name):
         raise RuntimeError("%s is not implemented for this application entity." %name)
-
-
-class VerificationSCP(BaseSCP):
-    '''A threaded verification SCP used for testing'''
-
-    def __init__(self, port=None):
-
-        if port is None:
-            port = 11112
-        ae = AE(scp_sop_class=[VerificationSOPClass], port=port)
-        BaseSCP.__init__(self,ae=ae)
-
-
-    def on_c_echo(self,delay=None):
-        '''Callback for ae.on_c_echo
-        :param delay: Wait (delay) in seconds before sending response (int/float)
-        '''
-        if delay is None:
-            delay = self.delay
-        time.sleep(delay)
-        
-        if self.send_abort:
-            self.ae.active_associations[0].abort()
-
-
-
-class StorageSCP(BaseSCP):
-    '''A threaded storage SCP used for testing'''
-
-    out_of_resources = failure.out_of_resources
-    ds_doesnt_match_sop_fail = failure.ds_doesnt_match_sop
-    cant_understand = failure.cant_understand
-    coercion_of_elements = warning.coercion_of_elements
-    ds_doesnt_match_sop_warn = warning.ds_doesnt_match_sop
-    elem_discard = warning.element_discard
-    success = success.empty
-
-    def __init__(self, port=None):
-
-        if port is None:
-            port = 11112
-        ae = AE(scp_sop_class=[PatientRootQueryRetrieveInformationModelMove,
-                               StudyRootQueryRetrieveInformationModelMove,
-                               PatientStudyOnlyQueryRetrieveInformationModelMove,
-                               CTImageStorage,
-                               RTImageStorage, MRImageStorage], port=port)
-        BaseSCP.__init__(self,ae=ae)
-        self.status = self.success
-
-    def on_c_store(self, ds):
-        '''Callback for ae.on_c_store'''
-        time.sleep(self.delay)
-        return self.status
-
-
-class FindSCP(BaseSCP):
-    '''A threaded dummy storage SCP used for testing'''
-
-    out_of_resources = failure.out_of_resources
-    identifier_doesnt_match_sop = failure.identifier_doesnt_match_sop
-    unable_to_process = failure.unable_to_process
-    matching_terminated_cancel = cancel.matching_terminated
-    success = success.matching
-    pending_matches = pending.matches
-    pending_warning = pending.matches_warning
-
-    def __init__(self, port=None):
-
-        if port is None:
-            port = 11112
-        ae = AE(scp_sop_class=[PatientRootQueryRetrieveInformationModelFind,
-                               StudyRootQueryRetrieveInformationModelFind,
-                               ModalityWorklistInformationFind,
-                               PatientStudyOnlyQueryRetrieveInformationModelFind],
-                               port=port)
-        BaseSCP.__init__(self,ae=ae)
-        self.status = self.pending_matches
-        self.cancel = False
-
-    def on_c_find(self, ds):
-
-        '''Callback for ae.on_c_find'''
-        time.sleep(self.delay)
-        ds = Dataset()
-        ds.PatientName = '*'
-        ds.QueryRetrieveLevel = "PATIENT"
-        if not isinstance(self.status, Status):
-            yield self.status, None
-            return
-        
-        if self.status.status_type != 'Pending':
-            yield self.status, None
-
-        if self.cancel:
-            yield self.matching_terminated_cancel, None
-
-        yield self.status, ds
-
-    def on_c_cancel_find(self):
-        '''Callback for ae.on_c_cancel_find'''
-        self.cancel = True
-
-
-class GetSCP(BaseSCP):
-    '''A threaded dummy storage SCP used for testing'''
-
-    out_of_resources_match = failure.out_of_resources_match
-    out_of_resources_unable = failure.out_of_resources_unable
-    identifier_doesnt_match_sop = failure.identifier_doesnt_match_sop
-    unable = failure.unable_to_process
-    cancel_status = cancel.suboperation
-
-    warning = warning.suboperation
-    success = success.suboperation
-    pending = pending.suboperation
- 
-    def __init__(self, port=None):
- 
-        if port is None:
-            port = 11112
-
-        ae = AE(scp_sop_class=[PatientRootQueryRetrieveInformationModelGet,
-                                    StudyRootQueryRetrieveInformationModelGet,
-                                    PatientStudyOnlyQueryRetrieveInformationModelGet,
-                                    CTImageStorage],
-                     scu_sop_class=[CTImageStorage],
-                     port=port)
-
-        BaseSCP.__init__(self,ae=ae)
-        self.status = self.success
-        self.cancel = False
-
-    def on_c_get(self, ds):
-        '''Callback for ae.on_c_get'''
-        time.sleep(self.delay)
-        ds = Dataset()
-        ds.PatientName = '*'
-        ds.QueryRetrieveLevel = "PATIENT"
-        if self.status.status_type not in ['Pending', 'Warning']:
-            yield 1
-            yield self.status, None
-
-        if self.cancel:
-            yield 1
-            yield self.cancel, None
-
-        yield 2
-        for ii in range(2):
-            yield self.status, DATASET
-
-    def on_c_cancel_get(self):
-        '''Callback for ae.on_c_cancel_get'''
-        self.cancel = True
-
-
-class MoveSCP(BaseSCP):
-    '''A threaded dummy storage SCP used for testing'''
-    out_of_resources_match = failure.out_of_resources_match
-    out_of_resources_unable = failure.out_of_resources_unable
-    move_destination_unknown = failure.move_destination_unknown
-    identifier_doesnt_match_sop = failure.identifier_doesnt_match_sop
-    unable_to_process = failure.unable_to_process
-    cancel_status = cancel.matching_terminated
-
-    warning = warning.suboperation
-    success = success.suboperation
-    pending = pending.suboperation
- 
-    def __init__(self, port=None):
-
-        if port is None:
-            port = 11112
-
-        ae = AE(scp_sop_class=[PatientRootQueryRetrieveInformationModelMove,
-                              StudyRootQueryRetrieveInformationModelMove,
-                              PatientStudyOnlyQueryRetrieveInformationModelMove,
-                              RTImageStorage, CTImageStorage],
-                     scu_sop_class=[RTImageStorage,
-                                    CTImageStorage],
-                     port=port)
-        BaseSCP.__init__(self,ae=ae)
-        self.status = self.pending
-        self.cancel = False
-
-    def on_c_move(self, ds, move_aet):
-        '''Callback for ae.on_c_find'''
-        time.sleep(self.delay)
-        ds = Dataset()
-        ds.PatientName = '*'
-        ds.QueryRetrieveLevel = "PATIENT"
-
-        # Check move_aet first
-        if move_aet != b'TESTMOVE        ':
-            yield 1
-            yield None, None
-
-        if self.status.status_type not in ['Pending', 'Warning']:
-            yield 1
-            yield 'localhost', 11113
-            yield self.status, None
-
-        if self.cancel:
-            yield 1
-            yield 'localhost', 11113
-            yield self.cancel, None
-
-        yield 2
-        yield 'localhost', 11113
-        for ii in range(2):
-            yield self.status, DATASET
-
-    def on_c_cancel_find(self):
-        '''Callback for ae.on_c_cancel_move'''
-        self.cancel = True
