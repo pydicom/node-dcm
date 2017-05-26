@@ -1,6 +1,6 @@
 '''
 
-providers.py: dicom services provider classes
+users.py: dicom services user classes
 
 Copyright (c) 2017 Vanessa Sochat
 
@@ -49,25 +49,29 @@ from .status import (
 )
 
 
-from node_dcm.base import BaseSCP
+from node_dcm.base import BaseSCU
+from node_dcm.utils import get_dcm_files
 
-class Echo(BaseSCP):
-    '''A threaded verification SCP used for testing'''
+class Echo(BaseSCU):
 
-    description = '''The echoscp application implements a Service Class
-                  Provider (SCP) for the Verification SOP Class. It listens
-                  for a DICOM C-ECHO message from a Service Class User
-                  (SCU) and sends a response. The application can be used
-                  to verify basic DICOM connectivity.'''
+    description='''The echoscu application implements a Service Class User
+                   (SCU) for the Verification SOP Class. It sends a DICOM
+                   C-ECHO message to a Service Class Provider (SCP) and
+                   waits for a response. The application can be used to
+                   verify basic DICOM connectivity.'''
 
 
-    def __init__(self, port=11112,name="ECHOSCP",prefer_uncompr=True,prefer_little=False,
-                       prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384, start=False):
+    def __init__(self, port=11112, peer=None, peer_port=None, 
+                       peer_name="ANY-SCP", name='ECHOSCU', prefer_uncompr=True,
+                       prefer_little=False, repeat=1, prefer_big=False, 
+                       implicit=False, timeout=None, dimse_timeout=None,
+                       acse_timeout=60, pdu_max=16382, start=False, abort=False):
 
         '''
         :param port: the port to use, default is 11112.
-        :param name: the title/name for the ae. 'ECHOSCP' is used if not defined.
+        :param peer: the hostname of DICOM peer (not required)
+        :param repeat: repeat N times (default is 1)
+        :param name: the title/name for the ae. 'ECHOSCU' is used if not defined.
         :param prefer_uncompr: prefer explicit VR local byte order (default)
         :param prefer_little: prefer explicit VR little endian TS
         :param perfer_big: prefer explicit VR big endian TS
@@ -76,10 +80,13 @@ class Echo(BaseSCP):
         :param acse_timeout: timeout for ACSE messages (default 60)
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
-        :param start: if True, start the ae.
+        :param start: if True, start the ae. (default False)
+        :param abort: if True, abort the association after releasing it (default False)
         ''' 
         self.port = port
-
+        self.repeat = repeat
+        self.abort = abort
+     
         # Update preferences
         self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
                                     prefer_little=prefer_little,
@@ -97,10 +104,35 @@ class Echo(BaseSCP):
         ae.network_timeout = timeout
         ae.acse_timeout = acse_timeout
         ae.dimse_timeout = dimse_timeout
-        BaseSCP.__init__(self,ae=ae)
+        BaseSCU.__init__(self,ae=ae)
 
         if start is True:
-            self.run()
+
+            # Make the association
+            assoc = self.make_assoc(address=peer,
+                                    peer_name=peer_name,
+                                    pdu_max=pdu_max,
+                                    port=peer_port)
+
+            self.send_echo()
+
+
+    def send_echo(self):
+        '''send an echo repeat times, and close the association when finished'''
+
+        # If we successfully Associated then send N DIMSE C-ECHOs
+        if self.assoc.is_established:
+
+            for ii in range(self.repeat):
+                status = assoc.send_c_echo()
+
+            if status is not None:
+
+                # Abort or release association
+                if self.abort:
+                    self.assoc.abort()
+                else:
+                    self.assoc.release()
 
 
     def on_c_echo(self,delay=None):
@@ -116,12 +148,15 @@ class Echo(BaseSCP):
 
 
 
-class Store(BaseSCP):
+class Store(BaseSCU):
 
-    description='''The storescp application implements a Service Class
-                   Provider (SCP) for the Storage SOP Class. It listens
-                   for a DICOM C-STORE message from a Service Class User
-                   (SCU) and stores the resulting DICOM dataset.'''
+    description='''Store implementis a Service Class User (SCU)
+                   for the Storage Service Class. It sends a 
+                   C-STORE message to a Storage Service Class 
+                   Provider (SCP) and waits for a response. The 
+                   application can be used to transmit DICOM
+                   images and other composite objectes, and should
+                   be instantiated first and then used to send'''
 
     out_of_resources = failure.out_of_resources
     ds_doesnt_match_sop_fail = failure.ds_doesnt_match_sop
@@ -131,14 +166,19 @@ class Store(BaseSCP):
     elem_discard = warning.element_discard
     success = success.empty
 
-    def __init__(self, output_dir,port=11112,name="STORESCP",prefer_uncompr=True,prefer_little=False,
-                       prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384, start=False, store=True):
+    def __init__(self, port=11112, peer=None, to_port=None, 
+                       to_name="ANY-SCP", name='STORESCU', prefer_uncompr=True,
+                       prefer_little=False, repeat=1, prefer_big=False, 
+                       implicit=False, timeout=None, dimse_timeout=None,
+                       acse_timeout=60, pdu_max=16382, start=False):
 
         '''
         :param port: the port to use, default is 11112.
-        :param output_dir: the output directory to store to
-        :param name: the title/name for the ae. 'STORESCP' is used if not defined.
+        :param peer: the hostname of DICOM peer (not required)
+        :param toport: the port of the peer to send to
+        :parm toname: the name of the peer to send to
+        :param repeat: repeat N times (default is 1)
+        :param name: the title/name for the ae. 'ECHOSCU' is used if not defined.
         :param prefer_uncompr: prefer explicit VR local byte order (default)
         :param prefer_little: prefer explicit VR little endian TS
         :param perfer_big: prefer explicit VR big endian TS
@@ -147,118 +187,75 @@ class Store(BaseSCP):
         :param acse_timeout: timeout for ACSE messages (default 60)
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
-        :param start: if True, start the ae.
-        :param store: store the data when it is received (default True)
+        :param start: if True, start the ae. (default False)
+        :param abort: if True, abort the association after releasing it (default False)
         ''' 
-
         self.port = port
-        self.store = store
-        self.set_output(output_dir)
-
+        self.repeat = repeat
+        self.abort = abort
+        self.update_peer(peer=peer,
+                         port=to_port,
+                         name=to_name)
+     
         # Update preferences
         self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
                                     prefer_little=prefer_little,
                                     prefer_big=prefer_big,
                                     implicit=implicit)
 
-        scp_sop_class = StorageSOPClassList.copy()
-        scp_sop_class.append(VerificationSOPClass)
+        ae = AE(ae_title=name,
+                port=self.port,
+                scu_sop_class=StorageSOPClassList,
+                scp_sop_class=[],
+                transfer_syntax=self.transfer_syntax)
 
-        ae = AE(scp_sop_class=scp_sop_class,
-                transfer_syntax = self.transfer_syntax, 
-                scu_sop_class=[],
-                ae_title=name,
-                port=port)
 
-        BaseSCP.__init__(self,ae=ae)
-
-        self.ae.maximum_pdu_size = max_pdu
-        self.ae.network_timeout = timeout
-        self.ae.acse_timeout = acse_timeout
-        self.ae.dimse_timeout = dimse_timeout
-
+        # Set timeouts, name, transfer
+        ae.ae_title=name
+        ae.maximum_pdu_size = pdu_max
+        ae.network_timeout = timeout
+        ae.acse_timeout = acse_timeout
+        ae.dimse_timeout = dimse_timeout
+        BaseSCU.__init__(self,ae=ae)
         self.status = self.success
-        if start is True:
-            self.run()
 
 
-    def set_output(self,output_dir):
-        '''set output will test and set the output directory. It must be read/writable
+    def send(self,dcm_files,to_address=None,to_port=None,to_name=None)
+        '''send will send one or more dicom files or folders of dicom files, to
+        a peer. The peer can be instantiated with the instance and used, or redefined 
+        at any time with the send function.
         '''
-        if not os.access(output_dir, os.W_OK|os.X_OK):
-            bot.error("No write permissions or the output directory may not exist:")
-            bot.error("    {0!s}".format(output_dir))
-            sys.exit(1)
-        self.output_dir = output_dir
+        self.release_assoc()
+        self.update_peer(address=to_address,
+                         port=to_port,
+                         name=to_name)
+
+        # Make the association -- #QUESTION - new association for each one?
+        assoc = self.make_assoc(address=peer,
+                                peer_name=peer_name,
+                                pdu_max=pdu_max,
+                                port=peer_port)
+
+        # Obtain valid dicom files
+        dcm_files = get_dcm_files(dcm_files,
+                                  check=True)
+
+        # Send each dataset
+        for dcm_file in dcm_files:
+            with open(dcm_file, 'rb') as filey:
+                dataset = read_file(filey, force=True)
+            
+            if self.assoc.is_established:
+                bot.info('Sending file: {0!s}'.format(dcm_file))
+                status = self.assoc.send_c_store(dataset)
+
+        self.assoc.release()
 
 
-    def on_c_store(self, dataset):
-        '''Write `dataset` to file as little endian implicit VR
-        :param dataset: pydicom.dataset.Dataset, The DICOM dataset sent via the C-STORE
-        :returns status: A valid return status code, see PS3.4 Annex B.2.3 or the
-                         StorageServiceClass implementation for the available statuses
-        '''
-        mode_prefix = 'UN'
-        mode_prefixes = {'CT Image Storage' : 'CT',
-                         'Enhanced CT Image Storage' : 'CTE',
-                         'MR Image Storage' : 'MR',
-                         'Enhanced MR Image Storage' : 'MRE',
-                         'Positron Emission Tomography Image Storage' : 'PT',
-                         'Enhanced PET Image Storage' : 'PTE',
-                         'RT Image Storage' : 'RI',
-                         'RT Dose Storage' : 'RD',
-                         'RT Plan Storage' : 'RP',
-                         'RT Structure Set Storage' : 'RS',
-                         'Computed Radiography Image Storage' : 'CR',
-                         'Ultrasound Image Storage' : 'US',
-                         'Enhanced Ultrasound Image Storage' : 'USE',
-                         'X-Ray Angiographic Image Storage' : 'XA',
-                         'Enhanced XA Image Storage' : 'XAE',
-                         'Nuclear Medicine Image Storage' : 'NM',
-                         'Secondary Capture Image Storage' : 'SC'}
-
-        try:
-            mode_prefix = mode_prefixes[dataset.SOPClassUID.__str__()]
-        except:
-            pass
-
-        filename = '{0!s}.{1!s}'.format(mode_prefix, dataset.SOPInstanceUID)
-        bot.info('Storing DICOM file: {0!s}'.format(filename))
-
-        if os.path.exists(filename):
-            bot.warning('DICOM file already exists, overwriting')
-
-        meta = Dataset()
-        meta.MediaStorageSOPClassUID = dataset.SOPClassUID
-        meta.MediaStorageSOPInstanceUID = dataset.SOPInstanceUID
-        meta.ImplementationClassUID = pynetdicom_uid_prefix
-
-        ds = FileDataset(filename, {}, file_meta=meta, preamble=b"\0" * 128)
-        ds.update(dataset)
-
-        ds.is_little_endian = True
-        ds.is_implicit_VR = True
-
-        if self.store is True:
-
-            filename = os.path.join(self.output_dir, filename)
-            try:
-                ds.save_as(filename)
-
-            except IOError:
-                bot.error('Could not write file to specified directory:')
-                bot.error("    {0!s}".format(os.path.dirname(filename)))
-                bot.error('Directory may not exist or you may not have write '
-                          'permission')
-                return 0xA700 # Failed - Out of Resources
-
-            except:
-                bot.error('Could not write file to specified directory:')
-                bot.error("    {0!s}".format(os.path.dirname(filename)))
-                return 0xA700 # Failed - Out of Resources
-
-        return 0x0000 # Success
-
+    def on_c_store(self, ds):
+        '''Callback for ae.on_c_store'''
+        time.sleep(self.delay)
+        return self.status
 
 
 class Find(BaseSCP):
@@ -279,14 +276,14 @@ class Find(BaseSCP):
     pending_matches = pending.matches
     pending_warning = pending.matches_warning
 
-    def __init__(self, dicom_home,port=11112,name="FINDSCP",prefer_uncompr=True,prefer_little=False,
+    def __init__(self, dicom_home,port=None,name=None,prefer_uncompr=True,prefer_little=False,
                        prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384):
+                       acse_timeout=None, pdu_max=None):
 
         '''create a FindSCP (Service Class Provider) for query/retrieve and basic workflow management
         :param dicom_home: must be the base folder of dicom files **TODO: make this more robust
         :param port: TCP/IP port number to listen on
-        :param name: the title/name for the ae. 'FINDSCP' is used if not defined.
+        :param name: the title/name for the ae. 'ECHOSCP' is used if not defined.
         :param prefer_uncompr: prefer explicit VR local byte order (default)
         :param prefer_little: prefer explicit VR little endian TS
         :param perfer_big: prefer explicit VR big endian TS
@@ -296,10 +293,23 @@ class Find(BaseSCP):
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
         '''
+
+        # First validate port
+        if port is None:
+            port = 11112
         self.port = port
 
         # Base for dicom files (we can do better here)
         self.base = dicom_home
+
+        if pdu_max is None:
+            pdu_max = 16384
+
+        if acse_timeout is None:
+            acse_timeout = 60
+ 
+        if name is None:
+            name = 'FINDSCP'
 
         ae = AE(scp_sop_class=QueryRetrieveSOPClassList,               
                 transfer_syntax=self.transfer_syntax,
@@ -370,13 +380,13 @@ class Get(BaseSCP):
     success = success.suboperation
     pending = pending.suboperation
 
-    def __init__(self, dicom_home,port=11112,name="GETSCP",prefer_uncompr=True,prefer_little=False,
+    def __init__(self, dicom_home,port=None,name=None,prefer_uncompr=True,prefer_little=False,
                        prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384, start=False):
+                       acse_timeout=None, pdu_max=None, start=False):
         '''
         :param dicom_home: must be the base folder of dicom files **TODO: make this more robust
         :param port: TCP/IP port number to listen on
-        :param name: the title/name for the ae. 'GETSCP' is used if not defined.
+        :param name: the title/name for the ae. 'ECHOSCP' is used if not defined.
         :param prefer_uncompr: prefer explicit VR local byte order (default)
         :param prefer_little: prefer explicit VR little endian TS
         :param perfer_big: prefer explicit VR big endian TS
@@ -386,7 +396,20 @@ class Get(BaseSCP):
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
         '''
+
+        # First validate port
+        if port is None:
+            port = 11112
         self.port = port
+
+        if pdu_max is None:
+            pdu_max = 16384
+
+        if acse_timeout is None:
+            acse_timeout = 60
+ 
+        if name is None:
+            name = 'GETSCP'
 
         self.base = dicom_home
 
@@ -410,7 +433,7 @@ class Get(BaseSCP):
         self.cancel = False
 
         if start is True:
-            self.run()
+            self.start()
 
 
     def on_c_get(self, patient_name, query_level):
@@ -463,13 +486,13 @@ class Move(BaseSCP):
     success = success.suboperation
     pending = pending.suboperation
  
-    def __init__(self, dicom_home,port=11112,name="MOVESCP",prefer_uncompr=True,prefer_little=False,
+    def __init__(self, dicom_home,port=None,name=None,prefer_uncompr=True,prefer_little=False,
                        prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384, start=False):
+                       acse_timeout=None, pdu_max=None, start=False):
         '''
         :param dicom_home: must be the base folder of dicom files **TODO: make this more robust
         :param port: TCP/IP port number to listen on
-        :param name: the title/name for the ae. 'MOVESCP' is used if not defined.
+        :param name: the title/name for the ae. 'ECHOSCP' is used if not defined.
         :param prefer_uncompr: prefer explicit VR local byte order (default)
         :param prefer_little: prefer explicit VR little endian TS
         :param perfer_big: prefer explicit VR big endian TS
@@ -479,7 +502,20 @@ class Move(BaseSCP):
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
         '''
-        self.port = port 
+
+        if port is None:
+            port = 11112
+        self.port = port
+
+        if pdu_max is None:
+            pdu_max = 16384
+
+        if acse_timeout is None:
+            acse_timeout = 60
+ 
+        if name is None:
+            name = 'MOVESCP'
+
         self.base = dicom_home
 
         ae = AE(ae_title=name,
@@ -498,7 +534,7 @@ class Move(BaseSCP):
         self.ae.dimse_timeout = args.dimse_timeout
 
         if start is True:
-            self.run()
+            self.start()
 
 
     def on_c_move(self, ds, move_aet):

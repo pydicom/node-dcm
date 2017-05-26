@@ -23,6 +23,7 @@ SOFTWARE.
 '''
 
 from .logman import bot
+from pydicom import read_file
 import socket
 import sys
 import os
@@ -37,3 +38,29 @@ def validate_port(port):
         bot.error("Cannot listen on port {}, insufficient privileges or "
             "already in use".format(args.port))
         sys.exit()
+
+
+def validate_dicoms(dcm_files):
+    '''validate dicoms will test opening one or more dicom files, and return a list
+    of valid files.
+    :param dcm_files: one or more dicom files to test'''
+    if not isinstance(dcm_files,list):
+        dcm_files = [dcm_files]
+
+    valids = []
+
+    bot.debug("Checking %s dicom files for validation." %(len(dcm_files))
+    for dcm_file in dcm_files:
+
+        try:
+            with open(dcm_file_in, 'rb') as filey:
+                dataset = read_file(filey, force=True)
+            bot.debug("%s is valid" %(os.path.basename(dcm_file)))
+            valids.append(dcm_file)
+             
+        except IOError:
+            bot.error('Cannot read input file {0!s}'.format(dcm_file))
+            sys.exit(1)
+
+    bot.info("Found %s valid dicom files" %(len(valids)))
+    return valids

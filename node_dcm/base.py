@@ -42,11 +42,68 @@ class BaseSCU(BaseServiceClass):
 
     def __init__(self,ae=None):
 
-        self.ae = ae
-        if self.ae is None:
-            bot.logger.error("The BaseSCU must be instantiated with an Application Entity (AE).")
+        self.assoc = None
+        self.pdu_max = 16384
+
+        self.to_name = "ANY-SCP"
+        self.to_address = None
+        self.to_port = 11112
+ 
+        BaseServiceClass.__init__(self,ae)
+ 
+    # Peers
+
+    def update_peer(address=None,port=None,name=None):
+        '''update_peer will update the address, port, and name of the peer AE'''
+
+        if name is not None:
+            self.to_name = name
+        
+        if port is not None:
+            self.to_port = port
+
+        if address is None and self.to_address is None:
+            bot.error("You must supply a peer address to make an association.")
             sys.exit(1)
-        BaseServiceClass.__init__(self)
+        self.to_address = address
+        bot.debug("Peer[%s] %s:%s" %(self.to_name,
+                                     self.to_address,
+                                     self.to_port))
+
+
+    # Associations
+
+    def release_assoc(self):
+        '''release assoc will release any associations that are open,
+        in preparation for a new one.
+        '''
+        if self.assoc is not None:
+            if self.assoc.is_established:
+                bot.debug("Found established association, releasing.")
+                self.assoc.release()
+
+
+    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None)
+        '''make an association with a peer at address, and port
+        :param address: the address of the peer
+        :param port: the port of the peer
+        :param to_name: the name of the peer
+        :param max_pdu: the max pdu (bytes)
+        '''
+        if pdu_max is not None:
+            self.pdu_max = pdu_max
+
+        self.update_peer(address=address,
+                         port=port,
+                         name=to_name)
+
+        self.release_assoc()
+        self.assoc = self.ae.associate(self.to_address,
+                                       self.to_port,
+                                       self.to_name,
+                                       max_pdu=self.pdu_max)
+
+        return self.assoc
 
 
 
@@ -55,11 +112,7 @@ class BaseSCP(BaseServiceClass):
 
     def __init__(self,ae=None):
 
-        self.ae = ae
-        if self.ae is None:
-            bot.logger.error("The BaseSCP must be instantiated with an Application Entity (AE).")
-            sys.exit(1)
-        BaseServiceClass.__init__(self)
+        BaseServiceClass.__init__(self,ae)
 
 
 
@@ -69,6 +122,7 @@ class BaseServiceClass(threading.Thread):
     def __init__(self,ae=None):
 
         self.ae = ae
+
         if self.ae is None:
             bot.logger.error("The base service must be instantiated with an Application Entity (AE).")
             sys.exit(1)

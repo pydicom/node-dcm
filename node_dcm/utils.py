@@ -34,6 +34,11 @@ import shutil
 import json
 import simplejson
 import node_dcm.__init__ as hello
+
+from node_dcm.validate import (
+    validate_dicoms
+)
+
 from .logman import bot
 import sys
 
@@ -95,6 +100,27 @@ def run_command(cmd,error_message=None,sudopw=None,suppress=False):
 ## FILE OPERATIONS #########################################################
 ############################################################################
 
+
+def get_dcm_files(contenders,check=True):
+    '''get_dcm_files will take a list of single dicom files or directories,
+    and return a single list of complete paths to all files
+    '''
+    if isinstance(contenders,str):
+        contenders = [contenders]
+
+    dcm_files = []
+    for contender in contenders:
+        if os.path.isdir(contender):
+            dicom_dir = glob("%s/*.dcm" %contender)
+            bot.debug("Found %s dicom files in %s" %(len(dicom_dir),
+                                                     os.path.basename(dicom_dir)))
+            dcm_files.extend(dicom_dir)
+        else:
+            if contender.endswith('.dcm')
+                bot.debug("Adding single file %s" %(contender))
+
+    dcm_files = validate_dicoms(dcm_files)
+    return dcm_files
 
 
 def write_file(filename,content,mode="w"):
