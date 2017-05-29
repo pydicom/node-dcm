@@ -29,7 +29,6 @@ You will be sitting at the base, in `/code`, which is also mounted to the host. 
 ```
 ./scripts/get_datasets.sh
 ls /data
-ls /data
 cookie-1   cookie-19  cookie-28  cookie-37  cookie-46  cookie-55  cookie-64
 cookie-10  cookie-2   cookie-29  cookie-38  cookie-47  cookie-56  cookie-65
 cookie-11  cookie-20  cookie-3	 cookie-39  cookie-48  cookie-57  cookie-66
