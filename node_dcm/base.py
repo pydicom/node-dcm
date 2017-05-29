@@ -40,6 +40,9 @@ from .validate import validate_port
 class BaseSCU(BaseServiceClass):
     '''Base class for the SCU classes'''
 
+
+    information_models = ['W','P','S','O']
+
     def __init__(self,ae=None):
 
         self.assoc = None
@@ -83,7 +86,7 @@ class BaseSCU(BaseServiceClass):
                 self.assoc.release()
 
 
-    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None)
+    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None,ext_neg=None)
         '''make an association with a peer at address, and port
         :param address: the address of the peer
         :param port: the port of the peer
@@ -101,9 +104,24 @@ class BaseSCU(BaseServiceClass):
         self.assoc = self.ae.associate(self.to_address,
                                        self.to_port,
                                        self.to_name,
-                                       max_pdu=self.pdu_max)
+                                       max_pdu=self.pdu_max,
+                                       ext_neg=ext_neg)
 
-        return self.assoc
+    # Information Models
+    def model_help(self):
+        print('''Valid information models are:
+              P: patient root information model
+              W: modality worklist information model
+              S: study root information model             
+              O: patient/study only information model
+              ''')
+
+    def check_information_model(self,model):
+        '''check information model validates the user selection of an information
+        model, and exits if not valid.'''
+        if model not in self.information_models:
+            self.model_help()
+            sys.exit(1)
 
 
 
