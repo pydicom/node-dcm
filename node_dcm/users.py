@@ -98,8 +98,8 @@ class Echo(BaseSCU):
                                     prefer_big=prefer_big,
                                     implicit=implicit)
 
-        ae = AE(scp_sop_class=[VerificationSOPClass], 
-                scu_sop_class=[],
+        ae = AE(scp_sop_class=[], 
+                scu_sop_class=[VerificationSOPClass],
                 port=self.port,
                 transfer_syntax=self.transfer_syntax)
 
@@ -124,15 +124,20 @@ class Echo(BaseSCU):
         if self.assoc.is_established:
 
             for ii in range(self.repeat):
-                status = assoc.send_c_echo()
+                status = self.assoc.send_c_echo()
 
             if status is not None:
 
                 # Abort or release association
+                bot.debug("%s received status %s" %(self.ae.ae_title,
+                                                    status))
                 if self.abort:
                     self.assoc.abort()
+                    bot.debug("%s aborting association." %self.self.ae.ae_title)
+
                 else:
                     self.assoc.release()
+                    bot.debug("%s releasing association." %self.ae.ae_title)
 
 
     def on_c_echo(self,delay=None):

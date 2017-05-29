@@ -14,7 +14,7 @@ NAME=$(docker ps -aqf "name=nodedcm_node_1")
 docker exec -it $NAME bash
 ```
 
-Since we just want a quick command line client, we will use pynetdicom3's provided script:
+If we want a quick command line client, we will use pynetdicom3's provided script:
 
 ```
 cd /tmp && git clone https://github.com/scaramallion/pynetdicom3
@@ -87,4 +87,21 @@ I: Received Echo Response (Status: Success)
 I: Releasing Association
 ```
 
-Next, we will try this using the node_dcm echo version (still under development)
+We can also use the Echo Service Class User provided by node_dcm, which would work well to be used within a function or class. You can see this quick example in [create_echoscu.py](create_echoscu.py). Remember, we already have our provider running in another terminal to receive this:
+
+```
+from node_dcm.users import Echo
+
+echoU = Echo(name="stanford-echo",port=99)
+
+# If the other echoP is running on port 11112, send an echo to it
+echoU.send_echo(to_port=11112,to_address='localhost')
+```
+
+and the response is the following:
+
+```
+DEBUG Peer[ANY-SCP] localhost:11112
+DEBUG stanford-echo    received status 0x0000: Success - 
+DEBUG stanford-echo    releasing association.
+```
