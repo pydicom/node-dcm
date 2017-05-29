@@ -32,7 +32,6 @@ import requests
 
 import shutil
 import json
-import simplejson
 import node_dcm.__init__ as hello
 
 from node_dcm.validate import (
@@ -116,7 +115,7 @@ def get_dcm_files(contenders,check=True):
                                                      os.path.basename(dicom_dir)))
             dcm_files.extend(dicom_dir)
         else:
-            if contender.endswith('.dcm')
+            if contender.endswith('.dcm'):
                 bot.debug("Adding single file %s" %(contender))
 
     dcm_files = validate_dicoms(dcm_files)
@@ -140,9 +139,9 @@ def write_json(json_obj,filename,mode="w",print_pretty=True):
     '''
     with open(filename,mode) as filey:
         if print_pretty == True:
-            filey.writelines(simplejson.dumps(json_obj, indent=4, separators=(',', ': ')))
+            filey.writelines(json.dumps(json_obj, indent=4, separators=(',', ': ')))
         else:
-            filey.writelines(simplejson.dumps(json_obj))
+            filey.writelines(json.dumps(json_obj))
     return filename
 
 

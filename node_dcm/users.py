@@ -23,7 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from .logman import bot
+from node_dcm.logman import bot
 import os
 import time
 
@@ -45,7 +45,7 @@ from pynetdicom3.pdu_primitives import (
     SCP_SCU_RoleSelectionNegotiation
 )
 
-from .status import (
+from node_dcm.status import (
     success,
     failure,
     pending,
@@ -67,11 +67,10 @@ class Echo(BaseSCU):
                    verify basic DICOM connectivity.'''
 
 
-    def __init__(self, port=11112, peer=None, peer_port=None, 
-                       peer_name="ANY-SCP", name='ECHOSCU', prefer_uncompr=True,
+    def __init__(self, port=11112, name='ECHOSCU', prefer_uncompr=True,
                        prefer_little=False, repeat=1, prefer_big=False, 
                        implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16382, start=False, abort=False):
+                       acse_timeout=60, pdu_max=16382,abort=False):
 
         '''
         :param port: the port to use, default is 11112.
@@ -94,7 +93,7 @@ class Echo(BaseSCU):
         self.abort = abort
      
         # Update preferences
-        self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
+        self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
                                     prefer_little=prefer_little,
                                     prefer_big=prefer_big,
                                     implicit=implicit)
@@ -112,19 +111,14 @@ class Echo(BaseSCU):
         ae.dimse_timeout = dimse_timeout
         BaseSCU.__init__(self,ae=ae)
 
-        if start is True:
 
-            # Make the association
-            assoc = self.make_assoc(address=peer,
-                                    peer_name=peer_name,
-                                    pdu_max=pdu_max,
-                                    port=peer_port)
-
-            self.send_echo()
-
-
-    def send_echo(self):
+    def send_echo(self,to_address=None,to_port=None,to_name=None):
         '''send an echo repeat times, and close the association when finished'''
+
+        # Make the association
+        self.make_assoc(address=to_address,
+                       to_name=to_name,
+                       port=to_port)
 
         # If we successfully Associated then send N DIMSE C-ECHOs
         if self.assoc.is_established:
@@ -204,7 +198,7 @@ class Store(BaseSCU):
                          name=to_name)
      
         # Update preferences
-        self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
+        self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
                                     prefer_little=prefer_little,
                                     prefer_big=prefer_big,
                                     implicit=implicit)
@@ -373,7 +367,7 @@ class Get(BaseSCU):
         ae = AE(scp_sop_class=[],
                 transfer_syntax=[ExplicitVRLittleEndian],
                 scu_sop_class=scu_class,
-                ae_title=name
+                ae_title=name,
                 port=0)
 
         BaseSCU.__init__(self,ae=ae)

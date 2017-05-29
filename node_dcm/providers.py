@@ -23,7 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from .logman import bot
+from node_dcm.logman import bot
 import os
 import time
 
@@ -39,7 +39,7 @@ from pynetdicom3 import (
 
 from pynetdicom3.sop_class import Status
 
-from .status import (
+from node_dcm.status import (
     success,
     failure,
     pending,
@@ -81,7 +81,7 @@ class Echo(BaseSCP):
         self.port = port
 
         # Update preferences
-        self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
+        self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
                                     prefer_little=prefer_little,
                                     prefer_big=prefer_big,
                                     implicit=implicit)
@@ -156,7 +156,7 @@ class Store(BaseSCP):
         self.set_output(output_dir)
 
         # Update preferences
-        self.update_transfer_syntax(prefer_uncompr=prefer_uncomp,
+        self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
                                     prefer_little=prefer_little,
                                     prefer_big=prefer_big,
                                     implicit=implicit)
@@ -301,6 +301,12 @@ class Find(BaseSCP):
         # Base for dicom files (we can do better here)
         self.base = dicom_home
 
+        # Update preferences
+        self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
+                                    prefer_little=prefer_little,
+                                    prefer_big=prefer_big,
+                                    implicit=implicit)
+
         ae = AE(scp_sop_class=QueryRetrieveSOPClassList,               
                 transfer_syntax=self.transfer_syntax,
                 scu_sop_class=[],
@@ -396,7 +402,7 @@ class Get(BaseSCP):
         ae = AE(scp_sop_class=scp_classes,
                 transfer_syntax=self.transfer_syntax,
                 scu_sop_class=[],
-                ae_title=name
+                ae_title=name,
                 port=port)
 
         BaseSCP.__init__(self,ae=ae)
@@ -492,10 +498,10 @@ class Move(BaseSCP):
         self.status = self.pending
         self.cancel = False
 
-        self.ae.maximum_pdu_size = args.max_pdu
-        self.ae.network_timeout = args.timeout
-        self.ae.acse_timeout = args.acse_timeout
-        self.ae.dimse_timeout = args.dimse_timeout
+        self.ae.maximum_pdu_size = max_pdu
+        self.ae.network_timeout = timeout
+        self.ae.acse_timeout = acse_timeout
+        self.ae.dimse_timeout = dimse_timeout
 
         if start is True:
             self.run()

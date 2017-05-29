@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from .logman import bot
+from node_dcm.logman import bot
 import os
 
 from pydicom.uid import (
@@ -32,106 +32,9 @@ from pydicom.uid import (
     UID
 )
 
-from .status import testing
+from node_dcm.status import testing
 import threading
-from .validate import validate_port
-
-
-class BaseSCU(BaseServiceClass):
-    '''Base class for the SCU classes'''
-
-
-    information_models = ['W','P','S','O']
-
-    def __init__(self,ae=None):
-
-        self.assoc = None
-        self.pdu_max = 16384
-
-        self.to_name = "ANY-SCP"
-        self.to_address = None
-        self.to_port = 11112
- 
-        BaseServiceClass.__init__(self,ae)
- 
-    # Peers
-
-    def update_peer(address=None,port=None,name=None):
-        '''update_peer will update the address, port, and name of the peer AE'''
-
-        if name is not None:
-            self.to_name = name
-        
-        if port is not None:
-            self.to_port = port
-
-        if address is None and self.to_address is None:
-            bot.error("You must supply a peer address to make an association.")
-            sys.exit(1)
-        self.to_address = address
-        bot.debug("Peer[%s] %s:%s" %(self.to_name,
-                                     self.to_address,
-                                     self.to_port))
-
-
-    # Associations
-
-    def release_assoc(self):
-        '''release assoc will release any associations that are open,
-        in preparation for a new one.
-        '''
-        if self.assoc is not None:
-            if self.assoc.is_established:
-                bot.debug("Found established association, releasing.")
-                self.assoc.release()
-
-
-    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None,ext_neg=None)
-        '''make an association with a peer at address, and port
-        :param address: the address of the peer
-        :param port: the port of the peer
-        :param to_name: the name of the peer
-        :param max_pdu: the max pdu (bytes)
-        '''
-        if pdu_max is not None:
-            self.pdu_max = pdu_max
-
-        self.update_peer(address=address,
-                         port=port,
-                         name=to_name)
-
-        self.release_assoc()
-        self.assoc = self.ae.associate(self.to_address,
-                                       self.to_port,
-                                       self.to_name,
-                                       max_pdu=self.pdu_max,
-                                       ext_neg=ext_neg)
-
-    # Information Models
-    def model_help(self):
-        print('''Valid information models are:
-              P: patient root information model
-              W: modality worklist information model
-              S: study root information model             
-              O: patient/study only information model
-              ''')
-
-    def check_information_model(self,model):
-        '''check information model validates the user selection of an information
-        model, and exits if not valid.'''
-        if model not in self.information_models:
-            self.model_help()
-            sys.exit(1)
-
-
-
-class BaseSCP(BaseServiceClass):
-    '''Base class for the SCP classes'''
-
-    def __init__(self,ae=None):
-
-        BaseServiceClass.__init__(self,ae)
-
+from node_dcm.validate import validate_port
 
 
 class BaseServiceClass(threading.Thread):
@@ -161,7 +64,7 @@ class BaseServiceClass(threading.Thread):
 
 
     def update_transfer_syntax(self,prefer_uncompr=True,prefer_little=False,
-                               prefer_big=False,implicit=False)
+                               prefer_big=False,implicit=False):
 
         transfer_syntax = [ImplicitVRLittleEndian,
                            ExplicitVRLittleEndian,
@@ -188,6 +91,7 @@ class BaseServiceClass(threading.Thread):
     def run(self):
         '''The thread run method'''
         self.ae.start()
+
 
     def stop(self):
         '''Stop the SCP thread'''
@@ -238,3 +142,101 @@ class BaseServiceClass(threading.Thread):
 
     def raise_not_implemented(self,name):
         raise RuntimeError("%s is not implemented for this application entity." %name)
+
+
+
+class BaseSCU(BaseServiceClass):
+    '''Base class for the SCU classes'''
+
+
+    information_models = ['W','P','S','O']
+
+    def __init__(self,ae=None):
+
+        self.assoc = None
+        self.pdu_max = 16384
+
+        self.to_name = "ANY-SCP"
+        self.to_address = None
+        self.to_port = 11112
+ 
+        BaseServiceClass.__init__(self,ae)
+ 
+    # Peers
+
+    def update_peer(self,address=None,port=None,name=None):
+        '''update_peer will update the address, port, and name of the peer AE'''
+
+        if name is not None:
+            self.to_name = name
+        
+        if port is not None:
+            self.to_port = port
+
+        if address is None and self.to_address is None:
+            bot.error("You must supply a peer address to make an association.")
+            sys.exit(1)
+        self.to_address = address
+        bot.debug("Peer[%s] %s:%s" %(self.to_name,
+                                     self.to_address,
+                                     self.to_port))
+
+
+    # Associations
+
+    def release_assoc(self):
+        '''release assoc will release any associations that are open,
+        in preparation for a new one.
+        '''
+        if self.assoc is not None:
+            if self.assoc.is_established:
+                bot.debug("Found established association, releasing.")
+                self.assoc.release()
+
+
+    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None,ext_neg=None):
+        '''make an association with a peer at address, and port
+        :param address: the address of the peer
+        :param port: the port of the peer
+        :param to_name: the name of the peer
+        :param max_pdu: the max pdu (bytes)
+        '''
+        if pdu_max is not None:
+            self.pdu_max = pdu_max
+
+        self.update_peer(address=address,
+                         port=port,
+                         name=to_name)
+
+        self.release_assoc()
+        self.assoc = self.ae.associate(self.to_address,
+                                       self.to_port,
+                                       self.to_name,
+                                       max_pdu=self.pdu_max,
+                                       ext_neg=ext_neg)
+
+    # Information Models
+    def model_help(self):
+        print('''Valid information models are:
+              P: patient root information model
+              W: modality worklist information model
+              S: study root information model             
+              O: patient/study only information model
+              ''')
+
+    def check_information_model(self,model):
+        '''check information model validates the user selection of an information
+        model, and exits if not valid.'''
+        if model not in self.information_models:
+            self.model_help()
+            sys.exit(1)
+
+
+
+class BaseSCP(BaseServiceClass):
+    '''Base class for the SCP classes'''
+
+    def __init__(self,ae=None):
+
+        BaseServiceClass.__init__(self,ae)
+

@@ -33,10 +33,10 @@ def validate_port(port):
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         test_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        test_socket.bind((os.popen('hostname').read()[:-1], args.port))
+        test_socket.bind((os.popen('hostname').read()[:-1], port))
     except socket.error:
         bot.error("Cannot listen on port {}, insufficient privileges or "
-            "already in use".format(args.port))
+            "already in use".format(port))
         sys.exit()
 
 
@@ -49,7 +49,7 @@ def validate_dicoms(dcm_files):
 
     valids = []
 
-    bot.debug("Checking %s dicom files for validation." %(len(dcm_files))
+    bot.debug("Checking %s dicom files for validation." %(len(dcm_files)))
     for dcm_file in dcm_files:
 
         try:
