@@ -42,21 +42,9 @@ cookie-17  cookie-26  cookie-35  cookie-44  cookie-53  cookie-62  cookie-9
 cookie-18  cookie-27  cookie-36  cookie-45  cookie-54  cookie-63
 ```
 
-## Test with An Echo
-The first thing I wanted to try was creating a provider to receive an echo, and then sending an echo as a user. In the shell above, in python I ran the follow, represented in [scripts/create_echoscu.py](scripts/create_echoscu.py):
+For examples of how to use and test, please see the [examples](examples) folder. So far, I've started the following examples:
 
-```
-from node_dcm.provider import Echo
-
-echoP = Echo(name="stanford-echo",start=True)
-```
-
-I then shelled into the image from another terminal to create the user (stopped here, don't totally understand this and having trouble getting it working :(
-
-```
-NAME=$(docker ps -aqf "name=nodedcm_node_1")
-docker exec -it $NAME bash
-```
+ - [echo](examples/echo)
 
 
 **under development**
