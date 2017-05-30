@@ -194,7 +194,7 @@ class BaseSCU(BaseServiceClass):
                 self.assoc.release()
 
 
-    def make_assoc(self,address=None,port=None,to_name=None,pdu_max=None,ext_neg=None):
+    def make_assoc(self,address=None,port=None,name=None,pdu_max=None,ext_neg=None):
         '''make an association with a peer at address, and port
         :param address: the address of the peer
         :param port: the port of the peer
@@ -206,7 +206,7 @@ class BaseSCU(BaseServiceClass):
 
         self.update_peer(address=address,
                          port=port,
-                         name=to_name)
+                         name=name)
 
         self.release_assoc()
         self.assoc = self.ae.associate(self.to_address,

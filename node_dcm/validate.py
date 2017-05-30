@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-from .logman import bot
+from node_dcm.logman import bot
 from pydicom import read_file
 import socket
 import sys
@@ -53,9 +53,8 @@ def validate_dicoms(dcm_files):
     for dcm_file in dcm_files:
 
         try:
-            with open(dcm_file_in, 'rb') as filey:
+            with open(dcm_file, 'rb') as filey:
                 dataset = read_file(filey, force=True)
-            bot.debug("%s is valid" %(os.path.basename(dcm_file)))
             valids.append(dcm_file)
              
         except IOError:

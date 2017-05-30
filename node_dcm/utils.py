@@ -26,6 +26,7 @@ SOFTWARE.
 '''
 
 import collections
+import fnmatch
 import os
 import re
 import requests
@@ -100,23 +101,36 @@ def run_command(cmd,error_message=None,sudopw=None,suppress=False):
 ############################################################################
 
 
-def get_dcm_files(contenders,check=True):
+def recursive_find_dicoms(base):
+    '''recursive find dicoms will search for dicom files in all directory levels
+    below a base. It uses get_dcm_files to find the files in the bases.
+    '''
+    dicoms = []
+    for root, dirnames, filenames in os.walk(base):
+        for filename in fnmatch.filter(filenames, '*.dcm'):
+            dicoms.append(os.path.join(root, filename))
+
+    return dicoms
+
+
+def get_dicom_files(contenders,check=True):
     '''get_dcm_files will take a list of single dicom files or directories,
     and return a single list of complete paths to all files
     '''
-    if isinstance(contenders,str):
+    if not isinstance(contenders,list):
         contenders = [contenders]
 
     dcm_files = []
     for contender in contenders:
         if os.path.isdir(contender):
-            dicom_dir = glob("%s/*.dcm" %contender)
+            dicom_dir = recursive_find_dicoms(contender)
             bot.debug("Found %s dicom files in %s" %(len(dicom_dir),
-                                                     os.path.basename(dicom_dir)))
+                                                     os.path.basename(contender)))
             dcm_files.extend(dicom_dir)
         else:
             if contender.endswith('.dcm'):
                 bot.debug("Adding single file %s" %(contender))
+                dcm_files.append(contender)
 
     dcm_files = validate_dicoms(dcm_files)
     return dcm_files

@@ -45,6 +45,13 @@ from pynetdicom3.pdu_primitives import (
     SCP_SCU_RoleSelectionNegotiation
 )
 
+from pydicom.uid import (
+    ExplicitVRLittleEndian, 
+    ExplicitVRBigEndian,
+    ImplicitVRLittleEndian,
+    UID
+)
+
 from node_dcm.status import (
     success,
     failure,
@@ -56,7 +63,7 @@ from node_dcm.status import (
 
 
 from node_dcm.base import BaseSCU
-from node_dcm.utils import get_dcm_files
+from node_dcm.utils import get_dicom_files
 
 class Echo(BaseSCU):
 
@@ -117,8 +124,8 @@ class Echo(BaseSCU):
 
         # Make the association
         self.make_assoc(address=to_address,
-                       to_name=to_name,
-                       port=to_port)
+                        name=to_name,
+                        port=to_port)
 
         # If we successfully Associated then send N DIMSE C-ECHOs
         if self.assoc.is_established:
@@ -132,12 +139,12 @@ class Echo(BaseSCU):
                 bot.debug("%s received status %s" %(self.ae.ae_title,
                                                     status))
                 if self.abort:
-                    self.assoc.abort()
                     bot.debug("%s aborting association." %self.self.ae.ae_title)
+                    self.assoc.abort()
 
                 else:
-                    self.assoc.release()
                     bot.debug("%s releasing association." %self.ae.ae_title)
+                    self.assoc.release()
 
 
     def on_c_echo(self,delay=None):
@@ -236,14 +243,14 @@ class Store(BaseSCU):
                          name=to_name)
 
         # Make the association -- #QUESTION - new association for each one?
-        assoc = self.make_assoc(address=peer,
-                                peer_name=peer_name,
-                                pdu_max=pdu_max,
-                                port=peer_port)
+        self.make_assoc(address=peer,
+                        name=peer_name,
+                        pdu_max=pdu_max,
+                        port=to_port)
 
         # Obtain valid dicom files
-        dcm_files = get_dcm_files(dcm_files,
-                                  check=True)
+        dcm_files = get_dicom_files(dcm_files,
+                                    check=True)
 
         # Send each dataset
         for dcm_file in dcm_files:
@@ -287,6 +294,7 @@ class Find(BaseSCU):
 
         '''create a FindSCU (Service Class USER) for query/retrieve
         :param name: the title/name for the ae. 'FINDSCU' is used if not defined.
+        :param start: start the AE
         ''' 
 
         if name is None:
@@ -304,12 +312,17 @@ class Find(BaseSCU):
         self.cancel = False
 
 
-    def find(self,keys,model=None,to_address=None,to_port=None,to_name=None,
+    def find(self,keys=None,model=None,to_address=None,to_port=None,to_name=None,
              patient_name=None):
         '''send will send one or more dicom files or folders of dicom files, to
         a peer. The peer can be instantiated with the instance and used, or redefined 
         at any time with the send function.
-        :params keys: a dictionary of keys/values to look up.
+        :params keys: a dictionary of keys/values to look up (I haven't implemented this yet)
+        :param model: the query_model to use. If not specified, defaults to PATIENT (P)
+        :param to_address: the ipaddress of the service class provider
+        :param to_port: the port of the service class provider
+        :param to_name: the name of the service class provider
+        :param patient_name: the patient name to find.
         '''
         if model is None:
             model = 'P'
@@ -321,7 +334,7 @@ class Find(BaseSCU):
 
         # Make the association -- #QUESTION - new association for each one?
         self.make_assoc(address=to_address,
-                        peer_name=to_name,
+                        name=to_name,
                         port=to_port)
 
         # Create a query dataset
@@ -339,7 +352,6 @@ class Find(BaseSCU):
             print(value)
 
         self.assoc.release()
-        self.ae.quit()
 
 
 
@@ -360,7 +372,7 @@ class Get(BaseSCU):
 
     def __init__(self, name=None):
         '''
-        :param name: the title/name for the ae. 'ECHOSCP' is used if not defined.
+        :param name: the title/name for the ae. 'GETSCU' is used if not defined.
         '''
         if name is None:
             name = 'GETSCU'
@@ -406,7 +418,7 @@ class Get(BaseSCU):
 
         # Make the association - updates self.assoc
         self.make_assoc(address=to_address,
-                        peer_name=to_name,
+                        name=to_name,
                         port=to_port,
                         ext_neg=ext_neg)
 
@@ -516,7 +528,7 @@ class Move(BaseSCU):
                 scp_sop_class=StorageSOPClassList,
                 transfer_syntax=[ExplicitVRLittleEndian])
 
-        BaseSCP.__init__(self,ae=ae)
+        BaseSCU.__init__(self,ae=ae)
         self.status = self.pending
         self.cancel = False
 
@@ -546,7 +558,7 @@ class Move(BaseSCU):
 
         # Make the association - updates self.assoc
         self.make_assoc(address=to_address,
-                        peer_name=to_name,
+                        name=to_name,
                         port=to_port,
                         ext_neg=ext_neg)
 

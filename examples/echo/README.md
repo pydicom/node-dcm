@@ -105,3 +105,14 @@ DEBUG Peer[ANY-SCP] localhost:11112
 DEBUG stanford-echo    received status 0x0000: Success - 
 DEBUG stanford-echo    releasing association.
 ```
+
+When I abort the association from the user, I see the following output in the provider terminal:
+
+```
+E: Peer has closed transport connection
+ERROR:pynetdicom3.dul:Peer has closed transport connection
+E: Association Aborted
+ERROR:pynetdicom3.assoc:Association Aborted
+```
+
+I think this is correct functionality, although I'm a bit thrown off by the error message. It would make sense (I think) for a peer to close an association after an echo when it is not needed anymore.

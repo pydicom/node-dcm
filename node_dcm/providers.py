@@ -50,6 +50,7 @@ from node_dcm.status import (
 
 
 from node_dcm.base import BaseSCP
+from node_dcm.utils import get_dicom_files
 
 class Echo(BaseSCP):
     '''A threaded verification SCP used for testing'''
@@ -281,7 +282,7 @@ class Find(BaseSCP):
 
     def __init__(self, dicom_home,port=11112,name="FINDSCP",prefer_uncompr=True,prefer_little=False,
                        prefer_big=False, implicit=False, timeout=None, dimse_timeout=None,
-                       acse_timeout=60, pdu_max=16384):
+                       acse_timeout=60, pdu_max=16384, update_on_find=False, start=False):
 
         '''create a FindSCP (Service Class Provider) for query/retrieve and basic workflow management
         :param dicom_home: must be the base folder of dicom files **TODO: make this more robust
@@ -295,11 +296,15 @@ class Find(BaseSCP):
         :param acse_timeout: timeout for ACSE messages (default 60)
         :param dimse_timeout: timeout for the DIMSE messages (default None) 
         :param pdu_max: set max receive pdu to n bytes (4096..131072) default 16382
+        :param update_on_find: if True, dicoms in dicom_home are updated on the find request
         '''
         self.port = port
 
         # Base for dicom files (we can do better here)
         self.base = dicom_home
+
+        self.dicoms = get_dicom_files(self.base)
+        self.update_on_find = update_on_find
 
         # Update preferences
         self.update_transfer_syntax(prefer_uncompr=prefer_uncompr,
@@ -323,20 +328,38 @@ class Find(BaseSCP):
         self.status = self.pending_matches
         self.cancel = False
 
+        if start is True:
+            self.run()
 
-    def on_c_find(self, query_level, patient_name):
+    def on_c_find(self, dataset):
+        '''on_c_find for a provider expects the user to send a dataset as a query
+        '''
+        bot.debug("Responding to request for find")
 
-        time.sleep(self.delay)
-        dicom_files = glob("%s/*.dcm" %(self.base))
+        # Should we update the dicom base for each find request (default False)
+        if self.update_on_find is True:
+            bot.debug("[%s] updating dicom list to search" %(self.ae.ae_title))
+            self.dicoms = get_dicom_files(self.base)
+        
+        # Variables that the user has specified in the query dataset
+        fields = self.get_dataset_query(dataset)
+        bot.debug("Requested fields include %s" %(",".join(fields)))
 
-        for dcm in dcm_files:
-            dataset = read_file(dcm, force=True)
+        for dcm in self.dicoms:
 
-            ds = Dataset()
-            ds.QueryRetrieveLevel = dataset.QueryRetrieveLevel
+            # Here we assume that the user wants to return
+            # datasets that match all of the query
+            ds = read_file(dcm, force=True)
+
+            is_match = self.match_dataset(query=dataset,
+                                          contender=ds,
+                                          fields=fields)
+
+            # I'm not sure if we only want to sent back a subset of information?
             ds.RetrieveAETitle = self.ae.ae_title
-            ds.PatientName = dataset.PatientName
-            if ds.PatientName == patient_name and ds.QueryRetrieveLevel == query_level: 
+
+            if is_match:
+                bot.debug("Found matching dataset %s" %dcm)
                 yield 0xff00, ds
 
             else:
@@ -347,6 +370,54 @@ class Find(BaseSCP):
                 return
 
             yield self.status, None
+
+
+    def match_dataset(self,query,contender,fields=None):
+        '''match dataset will compare a contender dataset to a query, optionally with fields
+        for comparison already defined (a list of the query.dir(). If all fields defined match
+        the contender, returns True, otherwise, False.
+        '''
+        if fields is None:
+            fields = self.get_dataset_query(query)
+
+        is_match = True
+        overlapping_fields = False
+        for field in fields:
+            if query.get(field) is not None and contender.get(field) is not None:
+                overlapping_fields = True
+                if query.get(field) != contender.get(field):
+                    is_match = False
+                
+        if overlapping_fields is False:
+            is_match = False
+        return is_match
+
+
+    def get_dataset_query(self,dataset):
+        '''get_dataset_query will return allowable, defined fields provided in a query dataset.
+        Datasets returned must contain all the fields specified, with the list reasonable to
+        search. Currently, I am only including the likely (human friendly) fields that would
+        be desired to search. A more robust find/search method should be implemented.
+        '''
+        searchable = ['Columns',
+                      'ConversionType',
+                      'ImageComments',
+                      'InstitutionName',
+                      'NameOfPhysiciansReadingStudy',
+                      'OperatorsName',
+                      'PatientID',
+                      'PatientName',
+                      'PatientSex',
+                      'ReferringPhysicianName',
+                      'Rows',
+                      'SOPClassUID',
+                      'SOPInstanceUID',
+                      'SeriesInstanceUID',
+                      'StudyDate',
+                      'StudyInstanceUID',
+                      'StudyTime']
+
+        return [x for x in dataset.dir() if dataset.get(x) != '' and x in searchable]
 
 
     def on_c_cancel_find(self):
