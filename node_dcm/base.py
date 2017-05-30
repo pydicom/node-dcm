@@ -163,6 +163,16 @@ class BaseSCU(BaseServiceClass):
         BaseServiceClass.__init__(self,ae)
  
     # Peers
+    def get_peer(self):
+        '''print peer will print a human friendly, readable address and name for a
+        remote peer'''
+        if self.to_address is not None:
+            return "[%s] %s:%s" %(self.to_name,
+                                  self.to_address,
+                                  self.to_port)
+
+        return "[%s] UNDEFINED" %(self.to_name)
+
 
     def update_peer(self,address=None,port=None,name=None):
         '''update_peer will update the address, port, and name of the peer AE'''

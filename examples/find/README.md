@@ -58,4 +58,19 @@ findU.find(to_port=11112,
            patient_name=patient_name)
 ```
 
-** still developing this - not working yet ! **
+** still figuring this out  **
+I am able to receive a status and type "None" to indicate no results (this is from the Find User):
+
+```
+DEBUG Peer[ANY-SCP] localhost:11112
+DEBUG Found established association, releasing.
+(<pynetdicom3.sop_class.Status object at 0x7f88dd451438>, None)
+```
+
+And I need to see if this is a bug, or the message/error returned given not finding a result. I think likely there is a problem with sending over the Dataset, and then querying - I need to read more about exactly how this is actually done :).
+
+```
+E: pydicom.write_dataset() failed:
+E: 'NoneType' object is not iterable
+E: Failed to decode the received Identifier dataset
+```

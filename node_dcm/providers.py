@@ -383,7 +383,11 @@ class Find(BaseSCP):
         is_match = True
         overlapping_fields = False
         for field in fields:
-            if query.get(field) is not None and contender.get(field) is not None:
+
+            if query.get(field) == "*":
+                continue
+
+            elif query.get(field) is not None and contender.get(field) is not None:
                 overlapping_fields = True
                 if query.get(field) != contender.get(field):
                     is_match = False

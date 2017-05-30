@@ -337,21 +337,25 @@ class Find(BaseSCU):
                         name=to_name,
                         port=to_port)
 
-        # Create a query dataset
-        dataset = Dataset()
-        dataset.PatientName = patient_name
-        dataset.QueryRetrieveLevel = "PATIENT"
+        if self.assoc.is_established:
 
-        # Send query
-        response = self.assoc.send_c_find(dataset, 
-                                          query_model=model)
+            # Create a query dataset
+            dataset = Dataset()
+            dataset.PatientName = patient_name
 
-        time.sleep(1)
-        for value in response:
-            pass
-            print(value)
+            # Send query
+            response = self.assoc.send_c_find(dataset, 
+                                              query_model=model)
 
-        self.assoc.release()
+            time.sleep(1)
+            for value in response:
+                pass
+                print(value)
+
+            self.assoc.release()
+
+        else:
+            bot.error("Association not established with %s" %self.get_peer())
 
 
 
